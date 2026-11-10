@@ -131,6 +131,24 @@
           />
         </div>
 
+        <div v-if="isAdmin" class="col-12">
+          <div class="form-check">
+            <input
+              id="create-user-account"
+              v-model="formData.create_user"
+              class="form-check-input"
+              type="checkbox"
+            />
+            <label class="form-check-label" for="create-user-account">
+              Créer également un compte utilisateur
+            </label>
+            <div class="form-text">
+              Un lien de définition du mot de passe sera envoyé à l’adresse
+              e-mail du membre.
+            </div>
+          </div>
+        </div>
+
         <div class="col-12 mt-4">
           <div class="d-flex justify-content-end gap-2">
             <button
@@ -156,10 +174,11 @@
 </template>
 
 <script>
-import { ref, onMounted } from "vue";
+import { computed, ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import api from "../../services/api.js";
 import { useToast } from "vue-toastification";
+import useAuthStore from "../../stores/auth.js";
 
 export default {
   name: "CreateMember",
@@ -167,6 +186,8 @@ export default {
   setup() {
     const router = useRouter();
     const toast = useToast();
+    const authStore = useAuthStore();
+    const isAdmin = computed(() => authStore.hasAnyRole("admin"));
     const loading = ref(false);
     const error = ref("");
     const success = ref("");
@@ -181,6 +202,7 @@ export default {
       categorie_id: "",
       statut: "actif",
       date_adhesion: new Date().toISOString().split("T")[0],
+      create_user: false,
     });
 
     const fetchCategories = async () => {
@@ -215,6 +237,7 @@ export default {
             categorie_id: "",
             statut: "actif",
             date_adhesion: new Date().toISOString().split("T")[0],
+            create_user: false,
           };
 
           // Redirect to members list after 2 seconds
@@ -228,7 +251,7 @@ export default {
       } catch (err) {
         console.error("Error creating member:", err);
         error.value =
-          err.response?.message ||
+          err.response?.data?.message ||
           "Une erreur est survenue lors de la création du membre";
         toast.error(error.value);
       } finally {
@@ -243,6 +266,7 @@ export default {
     return {
       formData,
       categories,
+      isAdmin,
       loading,
       error,
       success,

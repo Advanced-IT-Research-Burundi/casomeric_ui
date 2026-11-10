@@ -67,7 +67,7 @@
             <option value="admin">Admin</option>
             <option value="gestionnaire">Gestionnaire</option>
             <option value="responsable">Responsable</option>
-            <option value="membre">Membre</option>
+            <!-- <option value="membre">Membre</option> -->
           </select>
         </div>
 

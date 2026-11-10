@@ -414,6 +414,23 @@
                     <option value="suspendu">Suspendu</option>
                   </select>
                 </div>
+                <div v-if="!isEditing && isAdmin" class="col-12">
+                  <div class="form-check">
+                    <input
+                      id="create-user-account"
+                      v-model="formData.create_user"
+                      class="form-check-input"
+                      type="checkbox"
+                    />
+                    <label class="form-check-label" for="create-user-account">
+                      Créer également un compte utilisateur
+                    </label>
+                    <div class="form-text">
+                      Un lien de définition du mot de passe sera envoyé à
+                      l’adresse e-mail du membre.
+                    </div>
+                  </div>
+                </div>
               </div>
               <div class="mt-4 text-end">
                 <button
@@ -488,7 +505,7 @@ import useAuthStore from "../../stores/auth.js";
 import { useRouter } from "vue-router";
 
 const authStore = useAuthStore();
-const isAdmin = ref(authStore.hasAnyRole["Admin"]);
+const isAdmin = computed(() => authStore.hasAnyRole("admin"));
 const store = useStore();
 const toast = useToast();
 
@@ -516,6 +533,7 @@ const formData = reactive({
   categorie_id: "",
   statut: "actif",
   date_adhesion: "",
+  create_user: false,
 });
 
 // Initial Data Fetch
@@ -663,6 +681,7 @@ const resetForm = () => {
     categorie_id: "",
     statut: "actif",
     date_adhesion: new Date().toISOString().slice(0, 10),
+    create_user: false,
   });
 };
 
@@ -676,6 +695,7 @@ const fillForm = (member) => {
     telephone: member.telephone,
     categorie_id: member.categorie_id,
     statut: member.statut,
+    create_user: false,
     // Optional chaining in case date is null
     date_adhesion: member.date_adhesion
       ? member.date_adhesion.slice(0, 10)
@@ -690,14 +710,16 @@ const submitForm = async () => {
       await api.put(`/membres/${formData.id}`, formData);
       toast.success("Membre mis à jour avec succès");
     } else {
-      await api.post("/membres", formData);
-      toast.success("Membre créé avec succès");
+      const response = await api.post("/membres", formData);
+      toast.success(response?.message || "Membre créé avec succès");
     }
     await fetchMembers(pagination.value.current_page);
     closeModal();
   } catch (error) {
     console.error(error);
-    toast.error("Une erreur est survenue.");
+    toast.error(
+      error.response?.data?.message || "Une erreur est survenue."
+    );
   } finally {
     formLoading.value = false;
   }
@@ -716,7 +738,9 @@ const deleteMember = async () => {
     closeModal();
   } catch (error) {
     console.error(error);
-    toast.error("Impossible de supprimer ce membre.");
+    toast.error(
+      "Impossible de supprimer ce membre à cause des données relier avec lui",
+    );
   }
 };
 

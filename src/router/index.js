@@ -37,6 +37,17 @@ const routes = [
     component: () => import("../views/auth/Register.vue"),
     meta: { guest: true },
   },
+  {
+    path: "/forgot-password",
+    name: "ForgotPassword",
+    component: () => import("../views/auth/ForgotPassword.vue"),
+    meta: { guest: true },
+  },
+  {
+    path: "/reset-password",
+    name: "ResetPassword",
+    component: () => import("../views/auth/ResetPassword.vue"),
+  },
   // 404 route
 
   // Authenticated routes
