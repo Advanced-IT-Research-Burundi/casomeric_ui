@@ -101,7 +101,8 @@
                   id="statut"
                   class="form-select"
                   v-model="formData.statut"
-                  required
+                  disabled
+                  title="Une nouvelle assistance commence toujours « En attente »"
                 >
                   <option value="en_attente">En attente</option>
                   <option value="approuve">Approuvé</option>

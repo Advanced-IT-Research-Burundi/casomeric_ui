@@ -271,7 +271,7 @@ const columns = [
 
   {
     key: "montant_total_rembourser",
-    label: "Montant Remboursé",
+    label: "Total à rembourser",
     sortable: true,
     formatter: (value) => parseFloat(value).toLocaleString() + " FBU",
   },
@@ -280,8 +280,11 @@ const columns = [
     key: "montant_restant",
     label: "Montant Restant",
     sortable: true,
-    //fait arrondissement de 1000 en haut if the value is NAN
-    formatter: (value) => Math.ceil(parseFloat(value) / 1000) * 1000 + " FBU",
+    // Arrondi au millier supérieur ; une valeur vide ou invalide s'affiche "0 FBU" au lieu de "NaN FBU".
+    formatter: (value) => {
+      const n = parseFloat(value);
+      return (Number.isFinite(n) ? Math.ceil(n / 1000) * 1000 : 0) + " FBU";
+    },
   },
   {
     key: "date_demande",

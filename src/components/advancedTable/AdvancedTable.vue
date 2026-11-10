@@ -284,7 +284,8 @@ const paginationData = computed(() => {
 
 // Methods
 const getNestedValue = (obj, path) => {
-  return path.split(".").reduce((o, p) => (o && o[p]) || "", obj);
+  // Use ?? (not ||) so real values like 0 or false are kept; only missing values become "".
+  return path.split(".").reduce((o, p) => (o == null ? undefined : o[p]), obj) ?? "";
 };
 
 const getRowKey = (item, index) => {

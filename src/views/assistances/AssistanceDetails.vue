@@ -163,7 +163,7 @@
         </div>
 
         <!-- Preuve de Paiement -->
-        <div v-if="assistance.preuve_paiement" class="card shadow-sm mt-4">
+        <div v-if="assistance.preuve_versement" class="card shadow-sm mt-4">
           <div class="card-header bg-success text-white">
             <h5 class="mb-0">
               <i class="fas fa-check-double me-2"></i>Preuve de Paiement
@@ -181,14 +181,14 @@
               </div>
               <div class="btn-group">
                 <a
-                  :href="getJustificatifUrl(assistance.preuve_paiement)"
+                  :href="getJustificatifUrl(assistance.preuve_versement)"
                   target="_blank"
                   class="btn btn-outline-success btn-sm"
                 >
                   <i class="fas fa-eye me-1"></i>Voir
                 </a>
                 <a
-                  :href="getJustificatifUrl(assistance.preuve_paiement)"
+                  :href="getJustificatifUrl(assistance.preuve_versement)"
                   download
                   class="btn btn-success btn-sm"
                 >
@@ -200,7 +200,7 @@
             <!-- Viewer -->
             <div class="ratio ratio-16x9">
               <iframe
-                :src="getJustificatifUrl(assistance.preuve_paiement)"
+                :src="getJustificatifUrl(assistance.preuve_versement)"
                 class="border rounded"
               ></iframe>
             </div>
@@ -407,6 +407,8 @@ const getStatusClass = (statut) => {
   switch (statut) {
     case "en_attente":
       return "bg-warning";
+    case "en_cours":
+      return "bg-primary";
     case "approuve":
       return "bg-success";
     case "rejete":
@@ -422,6 +424,8 @@ const getStatusLabel = (statut) => {
   switch (statut) {
     case "en_attente":
       return "En attente";
+    case "en_cours":
+      return "Attente responsable";
     case "approuve":
       return "Approuvé";
     case "rejete":

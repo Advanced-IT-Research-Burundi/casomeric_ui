@@ -90,7 +90,8 @@
                   id="statut"
                   class="form-select"
                   v-model="formData.statut"
-                  required
+                  disabled
+                  title="Le statut change par Valider / Refuser / Verser"
                 >
                   <option value="en_attente">En attente</option>
                   <option value="approuve">Approuvé</option>

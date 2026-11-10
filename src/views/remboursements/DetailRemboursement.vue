@@ -129,7 +129,7 @@
               </div>
               <div class="d-flex justify-content-between mb-2">
                 <span class="text-muted">Montant à payer:</span>
-                <span class="fw-bold text-success">{{ formatCurrency(selectedRemboursement.montant_prevu) }}</span>
+                <span class="fw-bold text-success">{{ formatCurrency(resteDu(selectedRemboursement)) }}</span>
               </div>
             </div>
 
@@ -202,6 +202,10 @@ const error = ref(null);
 const credit = ref(null);
 
 const showApproveModal = ref(false);
+
+// What is still due on one installment (planned minus already paid).
+const resteDu = (echeance) =>
+  Math.max(0, Number(echeance?.montant_prevu || 0) - Number(echeance?.montant_paye || 0));
 const showFreePayModal = ref(false);
 const selectedRemboursement = ref(null);
 const freePayAmount = ref(null);
@@ -289,7 +293,8 @@ const confirmApprove = async () => {
     submitting.value = true;
     const formData = new FormData();
     formData.append("preuve_paiement", preuveFile.value);
-    formData.append("montant_paye", selectedRemboursement.value.montant_prevu);
+    // Pay what is still due on this installment (it may already be partly paid).
+    formData.append("montant_paye", resteDu(selectedRemboursement.value));
 
     await api.post(`/remboursements/${selectedRemboursement.value.id}/approve`, formData, {
       headers: { "Content-Type": "multipart/form-data" },

@@ -58,47 +58,54 @@
               <i class="fas fa-eye"></i>
             </button>
 
-            <!-- Approve Button: 
-                   - Gestionnaire/Admin can approve if 'en_attente'
-                   - Responsable/Admin can approve if 'en_cours' 
-              -->
+            <!-- Approve / reject: gestionnaire on "en attente";
+                 responsable / admin on "en attente" and "en cours" (final approval) -->
+            <template v-if="canDecide(item)">
+              <button
+                class="btn btn-success btn-sm"
+                @click="handleAction(item, 'approuve')"
+                :title="item.statut === 'en_cours' ? 'Approbation finale' : 'Valider'"
+              >
+                <i class="fas fa-check"></i>
+              </button>
+              <button
+                class="btn btn-danger btn-sm"
+                @click="handleAction(item, 'rejete')"
+                title="Refuser"
+              >
+                <i class="fas fa-times"></i>
+              </button>
+            </template>
+
+            <!-- Pay out: only once approved -->
             <button
-              v-if="
-                (item.statut === 'en_attente' && (isManager || isAdmin)) ||
-                (item.statut === 'en_cours' && (isResponsable || isAdmin))
-              "
-              class="btn btn-success btn-sm"
-              @click="handleAction(item, 'approuve')"
-              :title="
-                item.statut === 'en_attente'
-                  ? 'Valider (Gestionnaire)'
-                  : 'Approuver (Responsable)'
-              "
+              v-if="item.statut === 'approuve' && isStaff"
+              class="btn btn-primary btn-sm"
+              @click="openVersement(item)"
+              title="Verser l'assistance"
             >
-              <i class="fas fa-check"></i>
+              <i class="fas fa-hand-holding-usd"></i>
             </button>
 
-            <!-- Modify Button for Member: only if 'en_attente' -->
+            <!-- Proof of payment once paid -->
+            <a
+              v-if="item.statut === 'verse' && item.preuve_versement"
+              :href="item.preuve_versement"
+              target="_blank"
+              class="btn btn-outline-primary btn-sm"
+              title="Preuve de versement"
+            >
+              <i class="fas fa-receipt"></i>
+            </a>
+
+            <!-- Edit: only while nothing is decided -->
             <button
-              v-if="item.statut === 'en_attente' && isMember"
+              v-if="item.statut === 'en_attente' && isStaff"
               class="btn btn-warning btn-sm"
               @click="handleModifier(item)"
               title="Modifier"
             >
               <i class="fas fa-edit"></i>
-            </button>
-
-            <!-- Reject Button: Visible for Manager/Responsable/Admin if not finalized -->
-            <button
-              v-if="
-                (item.statut === 'en_attente' && (isManager || isAdmin)) ||
-                (item.statut === 'en_cours' && (isResponsable || isAdmin))
-              "
-              class="btn btn-danger btn-sm"
-              @click="handleAction(item, 'rejete')"
-              title="Refuser"
-            >
-              <i class="fas fa-times"></i>
             </button>
           </div>
         </template>
@@ -139,20 +146,14 @@
                 FBU</strong
               >.
             </p>
-            <div class="mb-3">
-              <label for="justificatifFile" class="form-label"
-                >Justificatif de paiement (Chèque/Bordereau)
-                <span class="text-danger">*</span></label
-              >
-              <input
-                type="file"
-                class="form-control"
-                id="justificatifFile"
-                @change="handleFileChange"
-                accept=".pdf,.jpg,.jpeg,.png"
-              />
-              <div class="form-text">Formats acceptés: PDF, JPG, PNG.</div>
-            </div>
+            <p class="text-muted small mb-0" v-if="selectedItem?.statut === 'en_attente' && isManager">
+              Après votre validation, la demande sera envoyée au responsable pour
+              l'approbation finale.
+            </p>
+            <p class="text-muted small mb-0" v-else>
+              Après l'approbation, l'assistance pourra être versée (bouton
+              <i class="fas fa-hand-holding-usd"></i>).
+            </p>
           </div>
           <div class="modal-footer">
             <button
@@ -166,13 +167,88 @@
               type="button"
               class="btn btn-success"
               @click="confirmApprobation"
-              :disabled="submitting || !justificatifFile"
+              :disabled="submitting"
             >
               <span
                 v-if="submitting"
                 class="spinner-border spinner-border-sm me-1"
               ></span>
               Confirmer l'approbation
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Versement (pay-out) Modal -->
+    <div
+      class="modal fade"
+      id="versementModal"
+      tabindex="-1"
+      aria-hidden="true"
+      ref="versementModalRef"
+    >
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Versement de l'assistance</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p v-if="selectedItem">
+              Versement à <strong>{{ selectedItem.membre?.full_name }}</strong> de
+              <strong>{{ parseFloat(selectedItem.montant).toLocaleString() }} FBU</strong>.
+            </p>
+
+            <!-- The money comes from the fund (caisse) -->
+            <div
+              v-if="caisse"
+              class="alert py-2"
+              :class="caisseSuffisante ? 'alert-info' : 'alert-danger'"
+            >
+              <i class="fas fa-cash-register me-1"></i>
+              Solde de la caisse :
+              <strong>{{ Number(caisse.solde).toLocaleString("fr-FR") }} FBU</strong>
+              <div class="small" v-if="caisseSuffisante">
+                Après ce versement :
+                {{ (Number(caisse.solde) - Number(selectedItem?.montant || 0)).toLocaleString("fr-FR") }} FBU
+              </div>
+              <div class="small" v-else>
+                Fonds insuffisants : le versement sera refusé.
+              </div>
+            </div>
+            <div v-else-if="loadingCaisse" class="form-text mb-2">
+              <i class="fas fa-spinner fa-spin me-1"></i>Lecture du solde de la caisse...
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Date du versement</label>
+              <input type="date" class="form-control" v-model="dateVersement" />
+            </div>
+            <div class="mb-3">
+              <label for="preuveVersement" class="form-label">
+                Preuve de versement (Chèque/Bordereau) <span class="text-danger">*</span>
+              </label>
+              <input
+                type="file"
+                class="form-control"
+                id="preuveVersement"
+                @change="handleFileChange"
+                accept=".pdf,.jpg,.jpeg,.png"
+              />
+              <div class="form-text">Formats acceptés : PDF, JPG, PNG (2 Mo max).</div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              @click="confirmVersement"
+              :disabled="submitting || !justificatifFile || (caisse && !caisseSuffisante)"
+            >
+              <span v-if="submitting" class="spinner-border spinner-border-sm me-1"></span>
+              Confirmer le versement
             </button>
           </div>
         </div>
@@ -200,6 +276,15 @@ const isAdmin = auth.hasAnyRole(["admin"]);
 const isManager = auth.hasAnyRole(["gestionnaire"]);
 const isResponsable = auth.hasAnyRole(["responsable"]);
 const isMember = auth.hasAnyRole(["membre"]);
+const isStaff = isAdmin || isManager || isResponsable;
+
+// Same rule as the API: gestionnaire decides "en attente";
+// responsable / admin decide "en attente" and "en cours" (final approval).
+const canDecide = (item) => {
+  if (item.statut === "en_attente") return isStaff;
+  if (item.statut === "en_cours") return isAdmin || isResponsable;
+  return false;
+};
 
 const assistances = ref([]);
 const loading = ref(false);
@@ -208,6 +293,16 @@ const selectedItem = ref(null);
 const justificatifFile = ref(null);
 const approveModalRef = ref(null);
 let modalInstance = null;
+const versementModalRef = ref(null);
+let versementModalInstance = null;
+const dateVersement = ref("");
+const caisse = ref(null);
+const loadingCaisse = ref(false);
+const caisseSuffisante = computed(
+  () =>
+    !caisse.value ||
+    Number(caisse.value.solde) >= Number(selectedItem.value?.montant || 0),
+);
 
 // Query parameters for API
 const queryParams = ref({
@@ -336,32 +431,73 @@ const handleAction = async (item, action) => {
     fetchAssistances();
   } catch (error) {
     console.error(`Error ${action} assistance:`, error);
-    toast.error(`Erreur lors de l'action sur l'assistance.`);
+    toast.error(error.response?.data?.message || `Erreur lors de l'action sur l'assistance.`);
   }
 };
 
 const confirmApprobation = async () => {
-  if (!justificatifFile.value) {
-    toast.warning("Veuillez sélectionner un fichier justificatif.");
-    return;
-  }
-
   submitting.value = true;
-  const formData = new FormData();
-  formData.append("justificatif", justificatifFile.value);
-
   try {
-    await api.post(`/assistances/approuve/${selectedItem.value.id}`, formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
-    toast.success("Assistance approuvée avec succès.");
+    const res = await api.post(`/assistances/approuve/${selectedItem.value.id}`);
+    toast.success(res?.message || "Assistance approuvée avec succès.");
     modalInstance.hide();
     fetchAssistances();
   } catch (error) {
     console.error("Error approving assistance:", error);
-    toast.error("Erreur lors de l'approbation de l'assistance.");
+    toast.error(error.response?.data?.message || "Erreur lors de l'approbation de l'assistance.");
+  } finally {
+    submitting.value = false;
+  }
+};
+
+// Pay out an approved assistance, with the proof of payment.
+const openVersement = (item) => {
+  selectedItem.value = item;
+  justificatifFile.value = null;
+  dateVersement.value = new Date().toISOString().slice(0, 10);
+  const input = document.getElementById("preuveVersement");
+  if (input) input.value = "";
+  if (!versementModalInstance) {
+    versementModalInstance = new Modal(versementModalRef.value);
+  }
+  versementModalInstance.show();
+  fetchCaisse();
+};
+
+// Fund balance shown before paying out (the API refuses if it is too low).
+const fetchCaisse = async () => {
+  caisse.value = null;
+  loadingCaisse.value = true;
+  try {
+    const res = await api.get("/caisse");
+    caisse.value = res?.data || null;
+  } catch (error) {
+    console.error("Error loading caisse:", error);
+  } finally {
+    loadingCaisse.value = false;
+  }
+};
+
+const confirmVersement = async () => {
+  if (!justificatifFile.value) {
+    toast.warning("Veuillez joindre la preuve de versement.");
+    return;
+  }
+  submitting.value = true;
+  const formData = new FormData();
+  formData.append("preuve_versement", justificatifFile.value);
+  if (dateVersement.value) formData.append("date_versement", dateVersement.value);
+
+  try {
+    await api.post(`/assistances/${selectedItem.value.id}/verser`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    toast.success("Versement enregistré avec succès.");
+    versementModalInstance.hide();
+    fetchAssistances();
+  } catch (error) {
+    console.error("Error paying assistance:", error);
+    toast.error(error.response?.data?.message || "Erreur lors du versement.");
   } finally {
     submitting.value = false;
   }
@@ -394,8 +530,10 @@ const getStatusLabel = (statut) => {
     return "En cours";
   } else if (statut === "approuve") {
     return "Approuvé";
+  } else if (statut === "verse") {
+    return "Versé";
   } else {
-    return "Terminé";
+    return statut;
   }
 };
 

@@ -77,14 +77,14 @@
             </div>
             <div class="col-6">
               <label for="document_justificatif" class="form-label"
-                >Document Justificatif (PDF)</label
+                >Document Justificatif (PDF ou image) <span class="text-danger">*</span></label
               >
               <input
                 type="file"
                 name="document_justificatif"
                 id="document_justificatif"
                 @change="handleFileChange"
-                accept=".pdf,application/pdf"
+                accept=".pdf,application/pdf,.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
                 class="form-control form-control-sm"
               />
               <small v-if="formData.document_justificatif" class="text-success">
@@ -163,9 +163,10 @@ const handleSelectAssistance = () => {
 const handleFileChange = (event) => {
   const file = event.target.files[0];
   if (file) {
-    // Validate file type
-    if (file.type !== "application/pdf") {
-      toast.error("Veuillez sélectionner un fichier PDF");
+    // Validate file type: PDF or image (photo of the document), same list as the API
+    const allowed = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+    if (!allowed.includes(file.type)) {
+      toast.error("Veuillez sélectionner un fichier PDF ou une image (JPG, PNG, WEBP)");
       event.target.value = ""; // Reset input
       formData.value.document_justificatif = null;
       return;
@@ -187,14 +188,9 @@ const handleFileChange = (event) => {
 const fetchData = async () => {
   loadingMembers.value = loadingTypes.value = true;
   try {
-    // request all three and handle different shapes safely
-    const [membersRes, typesRes] = await Promise.all([
-      api.get("/membres"),
-      api.get("/type-assistances"),
-    ]);
-
-    // members: may be paginated
-    members.value = membersRes?.data?.data ?? membersRes?.data ?? [];
+    // Only the assistance types are needed: the API knows which member is asking
+    // (the full member list is not loaded here any more).
+    const typesRes = await api.get("/type-assistances");
 
     // types: try data or direct
     assistanceTypes.value =
