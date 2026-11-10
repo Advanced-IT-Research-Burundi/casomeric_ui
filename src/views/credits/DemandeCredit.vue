@@ -68,14 +68,14 @@
             </div>
 
             <div class="col-md-6">
-              <label class="form-label">Montant Total à Rembourser</label>
+              <label class="form-label">Montant Total à Rembourser (estimation)</label>
               <div class="form-control bg-light">
                 {{ formData.montant_total_rembourser }} FBU
               </div>
             </div>
 
             <div class="col-md-6">
-              <label class="form-label">Mensualité</label>
+              <label class="form-label">Mensualité (estimation)</label>
               <div class="form-control bg-light">
                 {{ formData.montant_mensualite }} FBU
               </div>
@@ -214,7 +214,26 @@ const handleSubmit = async () => {
   }
 };
 
+// The rate comes from the configuration; the server recalculates the
+// total and the monthly payment, so the values shown here are an estimate.
+const fetchDefaultRate = async () => {
+  try {
+    const res = await api.get("/configurations");
+    const settings = res.data?.data || res.data || [];
+    const rate = Array.isArray(settings)
+      ? settings.find((s) => s.cle === "taux_interet_credit")
+      : null;
+    if (rate && !isNaN(parseFloat(rate.valeur))) {
+      formData.value.taux_interet = parseFloat(rate.valeur);
+    }
+  } catch (err) {
+    console.error("Error fetching interest rate:", err);
+  } finally {
+    calculatePayments();
+  }
+};
+
 onMounted(() => {
-  calculatePayments();
+  fetchDefaultRate();
 });
 </script>

@@ -92,9 +92,15 @@
         @page-change="handlePageChange"
         @per-page-change="handlePerPageChange"
       >
-        <template #column-statut="{ value }">
+        <template #column-statut="{ value, item }">
           <span class="badge rounded-1" :class="getClassByStatut(value)">
-            {{ getStatusLabel(value) }}
+            {{
+              isWaitingResponsable(item)
+                ? "Attente responsable"
+                : isInRepayment(item) && value === "en_cours"
+                  ? "En remboursement"
+                  : getStatusLabel(value)
+            }}
           </span>
         </template>
 
@@ -108,7 +114,9 @@
               <i class="fas fa-eye"></i>
             </button>
 
+            <!-- Repayment actions: only once the credit is granted -->
             <button
+              v-if="canSeeRepayments(item)"
               class="btn btn-outline-info btn-sm"
               @click="handleRemboursements(item)"
               title="Remboursements"
@@ -117,6 +125,7 @@
             </button>
 
             <button
+              v-if="canRepayManually(item)"
               class="btn btn-outline-primary btn-sm"
               @click="handleManualRemboursement(item)"
               title="Remboursement Manuel"
@@ -124,11 +133,12 @@
               <i class="fas fa-hand-holding-usd"></i>
             </button>
 
-            <template v-if="['en_attente'].includes(item.statut)">
+            <!-- Decision: gestionnaire on "en attente", responsable/admin also on "en cours" (2nd step) -->
+            <template v-if="canDecide(item)">
               <button
                 class="btn btn-success btn-sm"
                 @click="handleAction(item, 'approuve')"
-                title="Accepter"
+                :title="isWaitingResponsable(item) ? 'Approbation finale' : 'Accepter'"
               >
                 <i class="fas fa-check"></i>
               </button>
@@ -142,7 +152,8 @@
               </button>
             </template>
 
-            <template v-if="item.statut === 'en_attente'">
+            <!-- Edit / delete: only while nothing has been decided -->
+            <template v-if="canEdit(item)">
               <button
                 class="btn btn-warning btn-sm"
                 @click="handleModifier(item)"
@@ -178,10 +189,43 @@ import { value } from "@primeuix/themes/aura/knob";
 import BaseModal from "../../components/common/BaseModal.vue";
 
 const auth = useAuthStore();
+// Role names must match the API: admin, gestionnaire, responsable, membre.
 const isAdmin = auth.hasAnyRole("admin");
-const isManager = auth.hasAnyRole("manager");
+const isManager = auth.hasAnyRole("gestionnaire");
 const isResponsable = auth.hasAnyRole("responsable");
-const isMember = auth.hasAnyRole("member");
+const isMember = auth.hasAnyRole("membre");
+
+/*
+ * Which actions a credit row shows, step by step:
+ *  en_attente                      -> view, approve/reject, edit, delete
+ *  en_cours without approval date  -> waiting for the responsable: view (+ approve/reject for responsable/admin)
+ *  approuve, or en_cours with date -> being repaid: view, repayments, manual repayment
+ *  termine                         -> view, repayments
+ *  rejete                          -> view
+ * Note: the API uses "en_cours" both for "sent to the responsable" and "being repaid";
+ * date_approbation tells the two apart.
+ */
+const isWaitingResponsable = (credit) =>
+  credit.statut === "en_cours" && !credit.date_approbation;
+
+const isInRepayment = (credit) =>
+  credit.statut === "approuve" ||
+  (credit.statut === "en_cours" && !!credit.date_approbation);
+
+const canDecide = (credit) => {
+  if (credit.statut === "en_attente") return isAdmin || isManager || isResponsable;
+  if (isWaitingResponsable(credit)) return isAdmin || isResponsable;
+  return false;
+};
+
+const canEdit = (credit) =>
+  credit.statut === "en_attente" && (isAdmin || isManager || isResponsable);
+
+const canSeeRepayments = (credit) =>
+  isInRepayment(credit) || credit.statut === "termine";
+
+const canRepayManually = (credit) =>
+  isInRepayment(credit) && (isAdmin || isManager || isResponsable);
 const store = useStore();
 const toast = useToast();
 const loading = ref(false);
