@@ -172,7 +172,7 @@ const fetchUsers = async (page = 1) => {
     if (search.value) {
         params.search = search.value;
     }
-    const response = await api.get('/users', params);
+    const response = await api.get('/users', { params });
     store.state.users = response.data;
   } catch (error) {
     console.error("Erreur lors du chargement des utilisateurs:", error);

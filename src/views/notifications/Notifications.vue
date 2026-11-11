@@ -253,7 +253,7 @@ const markAsRead = async (notification) => {
     // Optimistic update
     notification.read = true;
 
-    await api.put(`/notifications/${notification.id}/read`);
+    await api.put(`/notifications/${notification.id}/mark-read`);
 
     // Update global store count if needed
     // store.dispatch('updateNotificationCount');
@@ -273,7 +273,7 @@ const markAllAsRead = async () => {
       n.read = true;
     });
 
-    await api.put("/notifications/mark-all-read");
+    await api.post("/notifications/mark-all-read");
     toast.success("Toutes les notifications ont été marquées comme lues.");
   } catch (error) {
     console.error("Error marking all as read:", error);

@@ -190,7 +190,7 @@ async function login() {
     } else if (authStore.user.role === "gestionnaire") {
       window.location.href = "/manager/dashboard";
     } else {
-      window.location.href = "/credits/mescredits";
+      window.location.href = "/ma-situation";
     }
   } catch (err) {
     console.error("Login error:", err);

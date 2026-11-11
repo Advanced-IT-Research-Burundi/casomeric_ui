@@ -148,7 +148,7 @@
               >
                 <div class="card-body p-3">
                   <small class="text-muted text-uppercase fw-bold"
-                    >Total BIF</small
+                    >Total FBU</small
                   >
                   <h5 class="mb-0 text-success fw-bold">
                     {{ formatCurrency(summary.total_bif) }}
@@ -193,6 +193,41 @@
                   <h5 class="mb-0 text-danger fw-bold">
                     {{ summary.en_retard }}
                   </h5>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-3" v-if="summary.membres_actifs !== undefined">
+              <div class="card border-0 shadow-sm border-start border-4 border-secondary">
+                <div class="card-body p-3">
+                  <small class="text-muted text-uppercase fw-bold">Membres ayant cotisé</small>
+                  <h5 class="mb-0 fw-bold">
+                    {{ summary.membres_cotisants }} / {{ summary.membres_actifs }} actifs
+                  </h5>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-9" v-if="summary.par_categorie && summary.par_categorie.length">
+              <div class="card border-0 shadow-sm">
+                <div class="card-body p-3">
+                  <small class="text-muted text-uppercase fw-bold">Collecté par catégorie</small>
+                  <table class="table table-sm mb-0 mt-2">
+                    <thead>
+                      <tr>
+                        <th>Catégorie</th>
+                        <th class="text-end">FBU</th>
+                        <th class="text-end">USD</th>
+                        <th class="text-end">Cotisations</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="c in summary.par_categorie" :key="c.categorie">
+                        <td>{{ c.categorie }}</td>
+                        <td class="text-end">{{ formatCurrency(c.total_fbu) }}</td>
+                        <td class="text-end">{{ formatCurrency(c.total_usd, "USD") }}</td>
+                        <td class="text-end">{{ c.nombre }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

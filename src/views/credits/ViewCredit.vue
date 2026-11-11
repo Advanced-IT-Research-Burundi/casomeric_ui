@@ -147,6 +147,85 @@
           </div>
         </div>
       </div>
+
+      <!-- Échéancier -->
+      <div class="col-12 mb-3" v-if="echeances.length">
+        <div class="card shadow-sm border-0">
+          <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 text-primary fw-bold">
+              <i class="bi bi-calendar3 me-2"></i>Échéancier de remboursement
+            </h5>
+            <div class="d-flex gap-2">
+              <button class="btn btn-sm btn-outline-success" @click="exporterEcheancier('excel')">
+                <i class="bi bi-file-earmark-excel me-1"></i>Excel
+              </button>
+              <button class="btn btn-sm btn-outline-danger" @click="exporterEcheancier('pdf')">
+                <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+              </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="row g-3 mb-3">
+              <div class="col-md-3">
+                <small class="text-muted d-block">Solde restant dû</small>
+                <span class="fw-bold text-danger">{{ formatCurrency(credit.montant_restant) }}</span>
+              </div>
+              <div class="col-md-3">
+                <small class="text-muted d-block">Déjà payé</small>
+                <span class="fw-bold text-success">{{ formatCurrency(credit.montant_deja_paye) }}</span>
+              </div>
+              <div class="col-md-3">
+                <small class="text-muted d-block">Prochaine échéance</small>
+                <span class="fw-bold" v-if="prochaineEcheance">
+                  {{ formatCurrency(resteEcheance(prochaineEcheance)) }} le
+                  {{ formatDate(prochaineEcheance.date_echeance) }}
+                </span>
+                <span class="fw-bold" v-else>-</span>
+              </div>
+              <div class="col-md-3">
+                <small class="text-muted d-block">Échéances restantes / en retard</small>
+                <span class="fw-bold">{{ credit.echeances_restantes }}</span> /
+                <span class="fw-bold" :class="{ 'text-danger': credit.echeances_en_retard }">{{
+                  credit.echeances_en_retard
+                }}</span>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>N°</th>
+                    <th>Date d'échéance</th>
+                    <th class="text-end">Montant prévu</th>
+                    <th class="text-end">Montant payé</th>
+                    <th>Date de paiement</th>
+                    <th>Statut</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="e in echeances"
+                    :key="e.id"
+                    :class="{ 'table-primary': prochaineEcheance && e.id === prochaineEcheance.id }"
+                  >
+                    <td>{{ e.numero_echeance }}</td>
+                    <td>{{ formatDate(e.date_echeance) }}</td>
+                    <td class="text-end">{{ formatCurrency(e.montant_prevu) }}</td>
+                    <td class="text-end">{{ formatCurrency(e.montant_paye) }}</td>
+                    <td>{{ formatDate(e.date_paiement) }}</td>
+                    <td>
+                      <span class="badge" :class="getRemboursementStatusBadge(e.statut)">
+                        {{ formatStatus(e.statut) }}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div
@@ -166,11 +245,26 @@ import { onMounted, computed } from "vue";
 import { useRoute } from "vue-router";
 import api from "../../services/api";
 import { useStore } from "vuex";
+import { exportExcel, exportPdf, formatMontant, formatDateExport } from "../../utils/useExport";
 
 const route = useRoute();
 const store = useStore();
 
 const credit = computed(() => store.state.credit);
+
+const echeances = computed(() =>
+  [...(credit.value?.remboursements || [])].sort(
+    (a, b) => (a.numero_echeance || 0) - (b.numero_echeance || 0),
+  ),
+);
+
+const resteEcheance = (e) =>
+  Math.max(0, parseFloat(e.montant_prevu || 0) - parseFloat(e.montant_paye || 0));
+
+// Première échéance non soldée, dans l'ordre des dates.
+const prochaineEcheance = computed(() =>
+  echeances.value.find((e) => e.statut !== "paye" && resteEcheance(e) > 0) || null,
+);
 
 const formatCurrency = (value) => {
   if (!value) return "0 FBU";
@@ -220,6 +314,42 @@ const getRemboursementStatusBadge = (status) => {
     default:
       return "bg-light text-dark";
   }
+};
+
+const exporterEcheancier = (format) => {
+  const c = credit.value;
+  const columns = [
+    { label: "N°", value: (e) => e.numero_echeance },
+    { label: "Date d'échéance", value: (e) => formatDateExport(e.date_echeance) },
+    { label: "Montant prévu", value: (e) => parseFloat(e.montant_prevu) || 0, pdf: (e) => formatMontant(e.montant_prevu) },
+    { label: "Montant payé", value: (e) => parseFloat(e.montant_paye) || 0, pdf: (e) => formatMontant(e.montant_paye) },
+    { label: "Date de paiement", value: (e) => formatDateExport(e.date_paiement) },
+    { label: "Statut", value: (e) => formatStatus(e.statut) },
+  ];
+  const fileName = `echeancier_credit_${c.id}`;
+  if (format === "excel") {
+    exportExcel({ fileName, sheetName: "Échéancier", columns, rows: echeances.value });
+    return;
+  }
+  exportPdf({
+    fileName,
+    title: `Échéancier du crédit n° ${c.id}`,
+    membre: c.membre ? { nom: `${c.membre.nom} ${c.membre.prenom}`, matricule: c.membre.matricule } : null,
+    summary: [
+      ["Montant accordé", formatMontant(c.montant_accorde)],
+      ["Taux / durée", `${c.taux_interet} % sur ${c.duree_mois} mois`],
+      ["Total à rembourser", formatMontant(c.montant_total_rembourser)],
+      ["Déjà payé", formatMontant(c.montant_deja_paye)],
+      ["Solde restant dû", formatMontant(c.montant_restant)],
+      [
+        "Prochaine échéance",
+        prochaineEcheance.value
+          ? `${formatMontant(resteEcheance(prochaineEcheance.value))} le ${formatDateExport(prochaineEcheance.value.date_echeance)}`
+          : "-",
+      ],
+    ],
+    tables: [{ columns, rows: echeances.value }],
+  });
 };
 
 onMounted(async () => {

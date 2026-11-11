@@ -72,6 +72,12 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: "/ma-situation",
+    name: "maSituation",
+    component: () => import("../views/members/MaSituation.vue"),
+    meta: { requiresAuth: true, title: "Ma situation" },
+  },
+  {
     path: "/mesCotisations",
     name: "mesCotisations",
     component: () => import("../views/cotisations/MesCotisations.vue"),
@@ -392,7 +398,7 @@ router.beforeEach(async (to, from, next) => {
 
     //if it a simple membre redirect him to mescredits
     if(authStore.user.role === "membre"){
-      return next({ name: "mescredits" });
+      return next({ name: "maSituation" });
     }
     return next({ name: "dashboard" });
   }

@@ -127,8 +127,12 @@
                 {{ stats.tauxRecouvrement }}%
               </div>
               <div class="stat-label">Taux Recouvrement</div>
-              <div class="stat-change text-success">
-                <i class="bi bi-star-fill"></i> Excellent
+              <div
+                class="stat-change"
+                :class="stats.tauxRecouvrement >= 90 ? 'text-success' : 'text-warning'"
+              >
+                <i class="bi" :class="stats.tauxRecouvrement >= 90 ? 'bi-star-fill' : 'bi-exclamation-circle'"></i>
+                {{ stats.tauxRecouvrement >= 90 ? "Bon" : "Échéances à relancer" }}
               </div>
             </div>
           </div>
@@ -145,8 +149,9 @@
                 {{ formatMontant(stats.soldeDisponible) }}
               </div>
               <div class="stat-label">Solde Disponible</div>
-              <div class="stat-change text-info">
-                <i class="bi bi-shield-check"></i> Sécurisé
+              <div class="stat-change" :class="stats.soldeDisponible >= 0 ? 'text-info' : 'text-danger'">
+                <i class="bi" :class="stats.soldeDisponible >= 0 ? 'bi-shield-check' : 'bi-exclamation-triangle-fill'"></i>
+                {{ stats.soldeDisponible >= 0 ? "Solde positif" : "Solde négatif" }}
               </div>
             </div>
           </div>

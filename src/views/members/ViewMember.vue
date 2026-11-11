@@ -2,9 +2,14 @@
   <div class="container py-4 px-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h2 class="mb-0">Détails du membre</h2>
-      <router-link to="/members" class="btn btn-outline-secondary">
-        <i class="fas fa-arrow-left me-2"></i>Retour à la liste
-      </router-link>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-danger" @click="exporterReleve" :disabled="exporting || loading">
+          <i class="bi bi-file-earmark-pdf me-1"></i>Relevé de situation
+        </button>
+        <router-link to="/members" class="btn btn-outline-secondary">
+          <i class="fas fa-arrow-left me-2"></i>Retour à la liste
+        </router-link>
+      </div>
     </div>
 
     <div v-if="loading" class="text-center py-5">
@@ -59,10 +64,28 @@ import api from "../../services/api";
 import MemberFinancialSummary from "../../components/members/MemberFinancialSummary.vue";
 import MemberInfoCard from "../../components/members/MemberInfoCard.vue";
 import ActivityList from "../../components/members/ActivityList.vue";
+import { exportReleveSituation, chargerCreditsEnCours } from "../../utils/useExport";
 
 const route = useRoute();
 const memberId = route.params.id;
 const loading = ref(true);
+const exporting = ref(false);
+
+// Relevé de situation financière du membre (section 7.3), identifié par son matricule.
+const exporterReleve = async () => {
+  exporting.value = true;
+  try {
+    const [situation, fiche] = await Promise.all([
+      api.get(`/membres/${memberId}/situation`).then((r) => r.data),
+      api.get(`/membres/${memberId}`).then((r) => r.data),
+    ]);
+    exportReleveSituation(situation, await chargerCreditsEnCours(fiche?.credits || []));
+  } catch (err) {
+    console.error("Erreur lors de l'export du relevé:", err);
+  } finally {
+    exporting.value = false;
+  }
+};
 const error = ref(null);
 const member = ref({
   id: memberId,
