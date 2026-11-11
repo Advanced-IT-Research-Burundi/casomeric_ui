@@ -2,6 +2,14 @@
   <div class="">
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h2 class="mb-0">Mes assistances</h2>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-success" @click="exporter('excel')" :disabled="exporting">
+          <i class="bi bi-file-earmark-excel me-1"></i>Excel
+        </button>
+        <button class="btn btn-outline-danger" @click="exporter('pdf')" :disabled="exporting">
+          <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+        </button>
+      </div>
       <router-link
         to="/assistances/add"
         class="btn btn-primary"
@@ -60,6 +68,7 @@ import api from "../../services/api";
 import AdvancedTable from "../../components/advancedTable/AdvancedTable.vue";
 import router from "../../router";
 import useAuthStore from "../../stores/auth";
+import { exportExcel, exportPdf, formatMontant, formatDateExport, getMembreConnecte } from "../../utils/useExport";
 
 const auth = useAuthStore();
 const isMember = auth.hasRole("membre");
@@ -100,12 +109,11 @@ const columns = [
   //   filterable: true,
   //   formatter: (value) => new Date(value).toLocaleDateString(),
   // },
-  // {
-  //   key: "statut",
-  //   label: "Statut",
-  //   sortable: true,
-  //   filterable: true,
-  // },
+  {
+    key: "statut",
+    label: "Statut",
+    sortable: true,
+  },
   {
     key: "created_at",
     label: "Créé le",
@@ -147,7 +155,7 @@ const fetchAssistances = async () => {
       }
     });
 
-    const response = await api.get("/mes-assistances", params);
+    const response = await api.get("/mes-assistances", { params });
 
     // Handle your API response structure
     if (response.success) {
@@ -186,8 +194,46 @@ const getStatusLabel = (statut) => {
     return "En cours";
   } else if (statut === "approuve") {
     return "Approuvé";
+  } else if (statut === "verse") {
+    return "Versé";
   } else {
-    return "Terminé";
+    return statut;
+  }
+};
+
+const exporting = ref(false);
+
+const exporter = async (format) => {
+  exporting.value = true;
+  try {
+    const response = await api.get("/mes-assistances", { params: { per_page: 1000 } });
+    const rows = response.data?.data || [];
+    const columns = [
+      { label: "N°", value: (a) => a.id },
+      { label: "Type", value: (a) => a.type_assistance?.nom || "" },
+      { label: "Montant", value: (a) => parseFloat(a.montant) || 0, pdf: (a) => formatMontant(a.montant) },
+      { label: "Date demande", value: (a) => formatDateExport(a.date_demande || a.created_at) },
+      { label: "Date versement", value: (a) => formatDateExport(a.date_versement) },
+      { label: "Statut", value: (a) => getStatusLabel(a.statut) },
+    ];
+    if (format === "excel") {
+      exportExcel({ fileName: "mes_assistances", sheetName: "Assistances", columns, rows });
+    } else {
+      const recu = rows
+        .filter((a) => ["approuve", "verse"].includes(a.statut))
+        .reduce((t, a) => t + (parseFloat(a.montant) || 0), 0);
+      exportPdf({
+        fileName: "mes_assistances",
+        title: "Historique des assistances",
+        membre: await getMembreConnecte(),
+        summary: [["Nombre de demandes", rows.length], ["Montant accordé", formatMontant(recu)]],
+        tables: [{ columns, rows }],
+      });
+    }
+  } catch (error) {
+    console.error("Erreur lors de l'export des assistances:", error);
+  } finally {
+    exporting.value = false;
   }
 };
 

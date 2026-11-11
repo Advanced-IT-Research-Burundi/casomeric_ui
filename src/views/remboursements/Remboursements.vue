@@ -216,7 +216,7 @@ const fetchRemboursements = async () => {
       if (v) params[`filter[${k}]`] = v;
     });
 
-    const res = await api.get("/remboursements", params);
+    const res = await api.get("/remboursements", { params });
     if (res?.data) {
       console.log(res.data);
       remboursements.value = res.data || [];

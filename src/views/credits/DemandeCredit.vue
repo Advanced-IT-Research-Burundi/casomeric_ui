@@ -96,14 +96,13 @@
 
             <div class="col-12">
               <label for="motif" class="form-label"
-                >Motif du Crédit <span class="text-danger">*</span></label
+                >Motif du Crédit (facultatif)</label
               >
               <textarea
                 class="form-control"
                 id="motif"
                 v-model="formData.motif"
                 rows="3"
-                required
                 placeholder="Décrivez la raison du crédit..."
               ></textarea>
             </div>
@@ -113,7 +112,7 @@
             <button
               type="button"
               class="btn btn-outline-secondary"
-              @click="$router.push('/credits')"
+              @click="$router.push('/credits/mescredits')"
               :disabled="loading"
             >
               Annuler

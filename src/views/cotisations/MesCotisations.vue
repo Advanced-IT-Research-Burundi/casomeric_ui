@@ -7,6 +7,12 @@
             <i class="bi bi-wallet2 me-2"></i>Mes Cotisations
           </h5>
           <div class="d-flex gap-2">
+            <button class="btn btn-outline-success text-nowrap" @click="exporter('excel')" :disabled="exporting">
+              <i class="bi bi-file-earmark-excel me-1"></i>Excel
+            </button>
+            <button class="btn btn-outline-danger text-nowrap" @click="exporter('pdf')" :disabled="exporting">
+              <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+            </button>
             <div class="input-group">
               <span class="input-group-text bg-light border-end-0">
                 <i class="bi bi-calendar-event text-muted"></i>
@@ -49,12 +55,12 @@
                 <th
                   class="py-3 text-secondary text-uppercase text-xs font-weight-bolder opacity-7 text-end"
                 >
-                  Salaire Global
+                  Mode de paiement
                 </th>
                 <th
                   class="py-3 text-secondary text-uppercase text-xs font-weight-bolder opacity-7 text-end"
                 >
-                  Montant Retenu
+                  Montant
                 </th>
                 <th
                   class="py-3 text-secondary text-uppercase text-xs font-weight-bolder opacity-7 text-end pe-4"
@@ -68,7 +74,7 @@
                 <td class="ps-4">
                   <div class="d-flex flex-column">
                     <span class="fw-bold text-dark">{{
-                      formatDate(cotisation.date_cotisation)
+                      formatDate(cotisation.date_paiement)
                     }}</span>
                     <span class="text-xs text-muted"
                       >Dossier: {{ cotisation.nomero_dossier || "-" }}</span
@@ -80,12 +86,12 @@
                     cotisation.matricule || "-"
                   }}</span>
                 </td>
-                <td class="text-end font-weight-bold">
-                  {{ formatCurrency(cotisation.global) }}
+                <td class="text-end">
+                  {{ cotisation.mode_paiement || "-" }}
                 </td>
                 <td class="text-end">
                   <span class="text-success fw-bold">{{
-                    formatCurrency(cotisation.retenu)
+                    formatCurrency(cotisation.montant, cotisation.devise)
                   }}</span>
                 </td>
                 <td class="text-end pe-4">
@@ -173,6 +179,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import api from "../../services/api";
+import { exportExcel, exportPdf, formatMontant, formatDateExport, getMembreConnecte } from "../../utils/useExport";
 
 const store = useStore();
 const loading = ref(false);
@@ -201,12 +208,50 @@ const fetchCotisations = async (page = 1) => {
   }
 };
 
+const exporting = ref(false);
+
+// Exporte toutes les cotisations (pas seulement la page affichée), avec le filtre de mois.
+const exporter = async (format) => {
+  exporting.value = true;
+  try {
+    let url = "/cotisations/mesCotisations?per_page=1000";
+    if (searchDate.value) url += `&date=${searchDate.value}`;
+    const response = await api.get(url);
+    const rows = response.data?.data || [];
+    const columns = [
+      { label: "Date", value: (c) => formatDateExport(c.date_paiement) },
+      { label: "Matricule", value: (c) => c.matricule || "" },
+      { label: "Montant", value: (c) => parseFloat(c.montant) || 0, pdf: (c) => formatMontant(c.montant, c.devise) },
+      { label: "Devise", value: (c) => c.devise || "FBU" },
+      { label: "Mode de paiement", value: (c) => c.mode_paiement || "" },
+      { label: "Statut", value: (c) => getPaymentStatusText(c) },
+    ];
+    const periode = searchDate.value ? `_${searchDate.value}` : "";
+    if (format === "excel") {
+      exportExcel({ fileName: `mes_cotisations${periode}`, sheetName: "Cotisations", columns, rows });
+    } else {
+      const total = rows.reduce((t, c) => t + (parseFloat(c.montant) || 0), 0);
+      exportPdf({
+        fileName: `mes_cotisations${periode}`,
+        title: "Historique des cotisations" + (searchDate.value ? ` - ${formatDate(searchDate.value)}` : ""),
+        membre: await getMembreConnecte(),
+        summary: [["Nombre de cotisations", rows.length], ["Total versé", formatMontant(total)]],
+        tables: [{ columns: columns.filter((c) => c.label !== "Devise"), rows }],
+      });
+    }
+  } catch (error) {
+    console.error("Erreur lors de l'export des cotisations:", error);
+  } finally {
+    exporting.value = false;
+  }
+};
+
 const resetSearch = () => {
   searchDate.value = "";
   fetchCotisations(1);
 };
 
-const formatCurrency = (value) => {
+const formatCurrency = (value, devise) => {
   if (value === null || value === undefined) return "-";
   // Assuming numbers come as strings or numbers, parse if needed
   const amount = parseFloat(value);
@@ -214,7 +259,7 @@ const formatCurrency = (value) => {
 
   return new Intl.NumberFormat("fr-FR", {
     style: "currency",
-    currency: "BIF", // Changed to BIF based on previous user correction (FBU currency)
+    currency: devise === "USD" ? "USD" : "BIF", // FBU = BIF
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(amount);
@@ -235,18 +280,18 @@ const formatDate = (dateString) => {
   });
 };
 
-const getPaymentStatusText = (cotisation) => {
-  // Logic can be adjusted based on business rules.
-  // Example: If 'retenu' > 0 it might be considered 'Payé' or 'Retenu'
-  if (cotisation.retenu && parseFloat(cotisation.retenu) > 0) return "Prélevé";
-  return "En attente";
+const STATUTS = {
+  paye: { text: "Payé", color: "bg-success-subtle text-success border border-success" },
+  partiel: { text: "Partiel", color: "bg-warning-subtle text-warning border border-warning" },
+  en_attente: { text: "En attente", color: "bg-warning-subtle text-warning border border-warning" },
+  en_retard: { text: "En retard", color: "bg-danger-subtle text-danger border border-danger" },
 };
 
-const getPaymentStatusColor = (cotisation) => {
-  if (cotisation.retenu && parseFloat(cotisation.retenu) > 0)
-    return "bg-success-subtle text-success border border-success";
-  return "bg-warning-subtle text-warning border border-warning";
-};
+const getPaymentStatusText = (cotisation) =>
+  STATUTS[cotisation.statut]?.text || cotisation.statut || "-";
+
+const getPaymentStatusColor = (cotisation) =>
+  STATUTS[cotisation.statut]?.color || "bg-light text-dark border";
 
 onMounted(() => {
   fetchCotisations();
@@ -262,5 +307,8 @@ onMounted(() => {
 }
 .bg-warning-subtle {
   background-color: #fff3cd !important;
+}
+.bg-danger-subtle {
+  background-color: #f8d7da !important;
 }
 </style>

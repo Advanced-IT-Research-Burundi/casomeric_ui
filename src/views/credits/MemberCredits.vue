@@ -2,9 +2,17 @@
   <div class="">
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h2 class="mb-0">Mes Crédits</h2>
-      <router-link to="/credits/demande" class="btn btn-primary">
-        <i class="fas fa-plus me-2"></i>Demander un crédit
-      </router-link>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-success" @click="exporter('excel')" :disabled="exporting">
+          <i class="bi bi-file-earmark-excel me-1"></i>Excel
+        </button>
+        <button class="btn btn-outline-danger" @click="exporter('pdf')" :disabled="exporting">
+          <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+        </button>
+        <router-link to="/credits/demande" class="btn btn-primary">
+          <i class="fas fa-plus me-2"></i>Demander un crédit
+        </router-link>
+      </div>
     </div>
 
     <div class="card">
@@ -67,6 +75,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import api from "../../services/api";
 import AdvancedTable from "../../components/advancedTable/AdvancedTable.vue";
+import { exportExcel, exportPdf, formatMontant, formatDateExport, getMembreConnecte } from "../../utils/useExport";
 
 const store = useStore();
 const router = useRouter();
@@ -147,7 +156,7 @@ const fetchCredits = async () => {
       date: queryParams.value.date,
     };
 
-    const response = await api.get("/mescredits", params);
+    const response = await api.get("/mescredits", { params });
     store.state.mescredits = response.data;
   } catch (error) {
     console.error("Error fetching credits:", error);
@@ -229,6 +238,44 @@ const handleShow = (item) => {
   // Since the router has /credits/:id for ViewCredit, we might need to check permissions there.
   // But let's try to navigate to it.
   router.push({ name: "creditsShow", params: { id: item.id } });
+};
+
+const exporting = ref(false);
+
+const exporter = async (format) => {
+  exporting.value = true;
+  try {
+    const response = await api.get("/mescredits", { params: { per_page: 1000 } });
+    const rows = response.data?.data || [];
+    const montant = (key) => ({ value: (c) => parseFloat(c[key]) || 0, pdf: (c) => formatMontant(c[key]) });
+    const columns = [
+      { label: "N°", value: (c) => c.id },
+      { label: "Date demande", value: (c) => formatDateExport(c.date_demande) },
+      { label: "Montant demandé", ...montant("montant_demande") },
+      { label: "Montant accordé", ...montant("montant_accorde") },
+      { label: "Taux (%)", value: (c) => parseFloat(c.taux_interet) || 0 },
+      { label: "Durée (mois)", value: (c) => c.duree_mois },
+      { label: "Mensualité", ...montant("montant_mensualite") },
+      { label: "Restant dû", ...montant("montant_restant") },
+      { label: "Statut", value: (c) => getStatusLabel(c.statut) },
+    ];
+    if (format === "excel") {
+      exportExcel({ fileName: "mes_credits", sheetName: "Crédits", columns, rows });
+    } else {
+      const restant = rows.reduce((t, c) => t + (parseFloat(c.montant_restant) || 0), 0);
+      exportPdf({
+        fileName: "mes_credits",
+        title: "Mes crédits",
+        membre: await getMembreConnecte(),
+        summary: [["Nombre de crédits", rows.length], ["Total restant dû", formatMontant(restant)]],
+        tables: [{ columns, rows }],
+      });
+    }
+  } catch (error) {
+    console.error("Erreur lors de l'export des crédits:", error);
+  } finally {
+    exporting.value = false;
+  }
 };
 
 // Computed Data for AdvancedTable
