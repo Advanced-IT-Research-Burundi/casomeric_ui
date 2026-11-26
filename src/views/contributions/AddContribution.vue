@@ -165,7 +165,7 @@
 
             <div class="col-md-6">
               <label for="reference_paiement" class="form-label"
-                >Référence de Paiement</label
+                >Référence de Paiement <span class="text-danger">*</span></label
               >
               <input
                 type="string"
