@@ -50,10 +50,12 @@
           </template>
 
           <template #column-montant_cotisation="{ item }">
-            <span class="fw-bold text-success"
-              >{{ formatAmount(item.montant_cotisation) }}
-              {{ item.devise }}</span
-            >
+            <div>
+              <span class="fw-bold text-success">{{ formatAmount(item.montant_cotisation) }} {{ item.devise }}</span>
+              <small v-if="item.frequence_paiement === 'semestriel'" class="d-block text-muted">
+                {{ formatAmount(item.montant_cotisation * 6) }} {{ item.devise }} / semestre
+              </small>
+            </div>
           </template>
 
           <template #column-frequence_paiement="{ value }">
@@ -133,7 +135,7 @@
                 <div class="col-md-6">
                   <label
                     class="form-label fw-bold small text-uppercase text-muted"
-                    >Montant Cotisation</label
+                    >Cotisation mensuelle de référence</label
                   >
                   <div class="input-group">
                     <input
@@ -143,6 +145,9 @@
                       required
                     />
                   </div>
+                  <small v-if="editing.frequence_paiement === 'semestriel'" class="form-text text-muted">
+                    Montant encaissé par semestre : {{ formatAmount(editing.montant_cotisation * 6) }} {{ editing.devise }}.
+                  </small>
                 </div>
                 <div class="col-md-6">
                   <label

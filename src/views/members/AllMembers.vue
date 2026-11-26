@@ -104,9 +104,7 @@
                   </div>
                 </td>
                 <td>
-                  <span class="text-sm fw-medium text-dark">{{
-                    member.categorie?.nom || member.categorie_id
-                  }}</span>
+                  <span class="text-sm fw-medium text-dark">{{ formatCategoryName(member) }}</span>
                 </td>
                 <td class="text-center">
                   <span class="badge" :class="getStatusBadge(member.statut)">
@@ -755,6 +753,15 @@ const getInitials = (member) => {
 const formatStatus = (status) => {
   if (!status) return "";
   return status.charAt(0).toUpperCase() + status.slice(1);
+};
+
+const formatCategoryName = (member) => {
+  const name = member?.categorie_nom || member?.categorie?.nom;
+  if (!name) return "Non définie";
+
+  return String(name)
+    .replace(/_/g, " ")
+    .replace(/\b\p{L}/gu, (letter) => letter.toUpperCase());
 };
 
 const getStatusBadge = (status) => {
